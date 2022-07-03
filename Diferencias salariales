@@ -1,0 +1,127 @@
+library(tidytuesdayR)
+library(data.table)
+library(tidyverse)
+library(camcorder)
+
+
+
+paygap <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-06-28/paygap.csv')
+
+paygap = setDT(paygap)
+paygap = paygap[order(employer_name, date_submitted), ]
+
+
+library(ggplot2)
+library(ggsci)
+library(ggtext)
+library(reshape)
+library(stringr)
+
+
+paygap = paygap[which(paygap$date_submitted >= "2018-01-01"), ]
+
+paygap$year_submitted = str_split(paygap$date_submitted, "\\-", simplify = TRUE)[,1]
+
+
+
+library(ggdist)
+
+
+x = paygap[, c(
+  "male_lower_quartile",
+  "female_lower_quartile",
+  "male_lower_middle_quartile",
+  "female_lower_middle_quartile",
+  "male_upper_middle_quartile",
+  "female_upper_middle_quartile",
+  "male_top_quartile",
+  "female_top_quartile",
+  "employer_size"
+), with = FALSE]
+
+
+x = melt(x, id.vars = "employer_size", variable.factor = FALSE)
+
+
+
+x$employer_size <- factor(x$employer_size ,levels = c("Less than 250","250 to 499","500 to 999",
+                                                                "1000 to 4999","5000 to 19,999","20,000 or more","Not Provided"),
+                               labels = c("Menos de 250","250 a 499","500 a 999",
+                                          "1000 a 4999","5000 a 19,999","Mas de 20,000","Sin informacion"),
+                               ordered = TRUE)
+
+
+
+
+
+x$level = str_replace_all(x$variable, "male|female|_", " ")
+x$level = str_squish(x$level)
+x$level = str_to_title(x$level)
+
+x$level = factor(
+  x$level,
+  levels = unique(x$level)
+)
+
+x$variable = str_split(x$variable, "_", simplify = TRUE)[, 1]
+x$variable = str_replace_all(x$variable, "female", "Mujer")
+x$variable = str_replace_all(x$variable, "male", "Hombre")
+
+
+x$level = str_replace_all(x$level, "Lower Quartile", "Renda baja")
+x$level = str_replace_all(x$level, "Lower Middle Quartile", "Renda media")
+x$level = str_replace_all(x$level, "Upper Middle Quartile", "Renda alta")
+x$level = str_replace_all(x$level, "Top Quartile", "Puestos directivos")
+
+
+
+x$level <- factor(x$level ,levels = c("Renda baja","250 to 499","Renda media",
+                                                      "Renda alta","Puestos directivos"),
+                          ordered = TRUE)
+
+
+x$value = x$value / 100
+ 
+
+
+gr2 = ggplot(data = x, aes(x = employer_size, y = value)) +
+  
+  stat_interval(aes(color = variable, color_ramp = stat(level)), 
+                 position = position_dodge(width=.5)) +
+  
+  facet_wrap(vars(level), nrow = 1) +
+  
+  scale_color_manual(values = c(
+    "Hombre"   = "#8c004b",
+    "Mujer" = "#f7c59f"
+  )) +
+  
+  scale_y_continuous(labels = scales::percent) +
+  
+  theme_minimal() +
+  
+  theme(
+    legend.position = "right",
+    legend.title = element_blank(),
+    
+    plot.title = element_markdown(margin = margin(b = 10)),
+    plot.title.position = "plot",
+    
+    strip.text = element_text(face = "bold"),
+    
+    panel.grid = element_blank(),
+    
+    axis.line = element_line(color = "white"),
+    axis.ticks = element_line(color = "white"),
+    axis.text = element_text(angle = 45),
+    
+    axis.title = element_blank()
+  ) +
+  
+  labs(
+    title = paste0(
+      "Sueldo segun <b style='color:#8c004b'> Hombres</b> i",
+      "<b style='color:#f7c59f'> Mujeres </b> segun el número de trabajadores en la empresa"
+    )
+  )
+gr2
